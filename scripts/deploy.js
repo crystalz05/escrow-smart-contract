@@ -16,7 +16,7 @@ async function main() {
 
   // .deploy() sends a transaction that creates the contract on-chain
   // The constructor argument is the freelancer's address
-  const escrow = await Escrow.deploy(freelancer.address);
+  const escrow = await Escrow.deploy(freelancer.address, 0, "0x70997970C51812dc3A010C7d01b50e0d17dc79C8");
 
   // Wait for the deployment transaction to be mined
   await escrow.waitForDeployment();

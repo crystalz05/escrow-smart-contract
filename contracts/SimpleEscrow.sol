@@ -12,20 +12,31 @@ contract SimpleEscrow {
     /// @notice The address that deployed the contract and deposited funds
     address public client;
 
+    //2% platform fee
+    uint256 public constant FEE_PERCENT = 2;
+    address public platform;
+
+    //adding enum
+    enum State{Created, Funded, Complete, Cancelled}
+    State public state;
+
+    //deadline
+    uint256 public deadline;
+
     /// @notice The address that will receive funds on approval
     address public freelancer;
 
     /// @notice The amount of ETH locked in escrow (in wei)
     uint256 public amount;
 
-    /// @notice Whether the client has already deposited funds
-    bool public isFunded;
+    // /// @notice Whether the client has already deposited funds
+    // bool public isFunded;
 
-    /// @notice Whether the client has approved and funds have been released
-    bool public isComplete;
+    // /// @notice Whether the client has approved and funds have been released
+    // bool public isComplete;
 
-    /// @notice Whether the escrow has been cancelled and funds refunded
-    bool public isCancelled;
+    // /// @notice Whether the escrow has been cancelled and funds refunded
+    // bool public isCancelled;
 
     // ──────────────────────────────────────────────
     // Events
@@ -46,11 +57,14 @@ contract SimpleEscrow {
 
     /// @notice Sets the client (deployer) and freelancer addresses
     /// @param _freelancer The address that will receive funds if approved
-    constructor(address _freelancer) {
+    constructor(address _freelancer, uint256 _durationDays, address _platform) {
         require(_freelancer != address(0), "Freelancer cannot be zero address");
         require(_freelancer != msg.sender, "Freelancer cannot be client");
+        deadline = block.timestamp + (_durationDays * 1 days);
         client = msg.sender;
         freelancer = _freelancer;
+        platform = _platform;
+        state = State.Created;
     }
 
     // ──────────────────────────────────────────────
@@ -61,37 +75,36 @@ contract SimpleEscrow {
     /// @dev msg.value is stored in `amount` and the contract holds the ETH.
     function fund() public payable {
         require(msg.sender == client, "Only client can fund");
-        require(!isFunded, "Already funded");
-        require(msg.value > 0, "Must send ETH");
+        require(state == State.Created || state == State.Cancelled, "Escrow already funded");
+        require(msg.value > 0.01 ether, "Minimum 0.01 ETH");
 
         amount = msg.value;
-        isFunded = true;
+        state = State.Funded;
 
         emit Funded(client, amount);
     }
 
     /// @notice Client approves the work — funds are transferred to the freelancer.
     /// @dev Uses .transfer() which forwards 2300 gas (safe for EOA recipients).
-    function approve() public {
+    function approve() public onlyClient {
         require(msg.sender == client, "Only client can approve");
-        require(isFunded, "Not funded yet");
-        require(!isCancelled, "Already cancelled");
-        require(!isComplete, "Already complete");
+        require(state == State.Funded, "Not Funded");
 
-        isComplete = true;
-        payable(freelancer).transfer(amount);
+        state = State.Complete;
+        uint256 fee = (amount * FEE_PERCENT)/100;
+        payable(platform).transfer(fee);
+        payable(freelancer).transfer(amount-fee);
 
-        emit Approved(freelancer, amount);
+        emit Approved(freelancer, amount-fee);
     }
 
     /// @notice Client cancels the escrow — funds are refunded to the client.
-    function cancel() public {
-        require(msg.sender == client, "Only client can cancel");
-        require(isFunded, "Not funded yet");
-        require(!isComplete, "Already approved");
-        require(!isCancelled, "Already cancelled");
+    function cancel() public onlyClient {
+        require(msg.sender == client || msg.sender == freelancer, "Only client or freelancer can cancel");
+        require(state == State.Created || state == State.Funded, "Already approved");
+        require(block.timestamp > deadline, "Cannot cancel before deadline");
 
-        isCancelled = true;
+        state = State.Cancelled;
         payable(client).transfer(amount);
 
         emit Cancelled(client, amount);
@@ -107,18 +120,14 @@ contract SimpleEscrow {
     }
 
     /// @notice Returns the current state of the escrow as three booleans
-    /// @return funded   Whether client has deposited
-    /// @return complete Whether work has been approved and paid
-    /// @return cancelled Whether escrow has been cancelled and refunded
-    function getStatus()
-        public
-        view
-        returns (
-            bool funded,
-            bool complete,
-            bool cancelled
-        )
+    /// @return state  Whether client has deposited
+    function getStatus() public view returns (State)
     {
-        return (isFunded, isComplete, isCancelled);
+        return state;
+    }
+
+    modifier onlyClient(){
+        require(msg.sender == client, "Only Client");
+        _;
     }
 }

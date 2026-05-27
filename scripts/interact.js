@@ -6,9 +6,9 @@ async function main() {
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   // ⚠️ REPLACE THIS with the actual deployed address from deploy.js output
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  const escrowAddress = "YOUR_DEPLOYED_ADDRESS_HERE";
+  const escrowAddress = "0x1429859428C0aBc9C2C47C8Ee9FBaf82cFA0F20f";
 
-  if (escrowAddress === "YOUR_DEPLOYED_ADDRESS_HERE") {
+  if (escrowAddress === "d") {
     console.error("❌ You need to paste your deployed contract address into this script first!");
     console.error("   Run: npx hardhat run scripts/deploy.js --network localhost");
     console.error("   Then copy the deployed address here.");
@@ -22,10 +22,11 @@ async function main() {
   console.log(" SimpleEscrow Interaction Script");
   console.log("══════════════════════════════════════\n");
 
+
   // ── Step 1: Fund the escrow ───────────────────
-  console.log("Step 1: Funding escrow with 0.01 ETH...");
+  console.log("Step 1: Funding escrow with 0.02 ETH...");
   const fundTx = await escrow.connect(client).fund({
-    value: ethers.parseEther("0.01"),
+    value: ethers.parseEther("0.02"),
   });
   await fundTx.wait();
   console.log("   ✅ Funded!");
@@ -35,12 +36,32 @@ async function main() {
     "ETH"
   );
 
+      // Cancelling test
+  console.log("Testing cancelling order");
+  const cancelledOrder = await escrow.connect(freelancer).cancel();
+  await cancelledOrder.wait();
+
+    // ── Step 1: Fund the escrow ───────────────────
+  console.log("Step 1: Funding escrow Second Time with 0.02 ETH...");
+  const fundTx2 = await escrow.connect(client).fund({
+    value: ethers.parseEther("0.03"),
+  });
+  await fundTx2.wait();
+  console.log("   ✅ Funded!");
+  console.log(
+    "   Contract balance:",
+    ethers.formatEther(await escrow.getBalance()),
+    "ETH"
+  );
+
+
   // ── Step 2: Check status ──────────────────────
-  const [funded, complete, cancelled] = await escrow.getStatus();
+  const status = await escrow.getStatus();
   console.log(
     "\nStep 2: Status check →",
-    `Funded: ${funded} | Complete: ${complete} | Cancelled: ${cancelled}`
+    `Status: ${status}`
   );
+  
 
   // ── Step 3: Approve and release funds ─────────
   console.log("\nStep 3: Approving work — releasing funds to freelancer...");
@@ -63,10 +84,10 @@ async function main() {
   );
 
   // ── Final status ──────────────────────────────
-  const [f2, c2, x2] = await escrow.getStatus();
+  const state = await escrow.getStatus();
   console.log(
     "\nFinal status →",
-    `Funded: ${f2} | Complete: ${c2} | Cancelled: ${x2}`
+    `state: ${state}`
   );
   console.log("\n══════════════════════════════════════");
   console.log(" Done! Escrow lifecycle complete.");
